@@ -1,0 +1,22 @@
+import os
+from split_markers import split_markers
+
+d = '../markers'
+genes = [o for o in os.listdir(d) 
+                    if os.path.isdir(os.path.join(d, o))
+                    and o not in ['.snakemake', '__pycache__']]
+
+rule all:
+    input:
+        expand("../markers/{gene}/markers", gene=genes)
+
+rule split_markers:
+    input:
+        "../markers/{gene}/markers_40kb_freq_gt.01"
+    output:
+        directory("../markers/{gene}/markers")
+    run:
+        shell("mkdir -p ../markers/{wildcards.gene}/markers")
+        in_file = f'{input}'
+        out_file = f'../markers/{wildcards.gene}/markers'
+        split_markers(in_file, out_file)
