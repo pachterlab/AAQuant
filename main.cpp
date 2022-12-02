@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
     std::string od = "";
     std::unordered_map<std::string, std::string> bam_files;
 
-    float noise_size = 0;
+    float noise_step = 0., noise_ub = 0.;
 
     // Argument parsing
     CLI::App app{"Generates a de Bruijn Graph from fastx/bam files and counts the abundances of the constituent unitigs."};
@@ -45,7 +45,8 @@ int main(int argc, char* argv[]) {
     app.add_option("-l,--transcriptomic-filter", tx_kmer_path, "Assume unitigs that have coverage < max(1, 0.5\% of median individual transcriptomic coverage) for an individual are sequencing errors and prune them. arg is a newline separated list of the kmers in all annotated transcripts of the gene.");
     app.add_flag("-c,--low-coverage-filter", low_coverage_filter, "Filter out unitigs with per-individual coverage low w.r.t. the per-individual coverage of the H1 neighborhood around the unitig.");
     app.add_option("--ref-fasta-filter", ref_filter_path, "Fasta file containing one sequence per entry. We find all kmers within H1 of the constituent kmers and prune the low coverage ones.");
-    app.add_option("--noise", noise_size, "Add/subtract Poisson-distributed noise to count");
+    app.add_option("--noise-step", noise_step, "Add/subtract Poisson-distributed noise in increments of [arg] to count (must supply --noise-ub as well)");
+    app.add_option("--noise-ub", noise_ub, "Upper bounds of magnitude of noise to be added/subtracted Poisson-distributed noise to count");
 
     app.add_option("--canary", canary_path, "List of sanity check kmers to check how they are retained after the individual pruning steps.");
     app.add_flag("--keep", keep_canary_kmers, "Keep all counts for canary unitigs.");
@@ -200,39 +201,77 @@ int main(int argc, char* argv[]) {
     t_graph.avg_counts(canary, keep_canary_kmers, true, opt.verbose);
     if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
 
-    if (noise_size > 0) {
-        if (opt.verbose) std::cout << "Adding Poisson-distributed noise with parameter mu*" << noise_size << " to counts." << std::endl;
-        t_graph.add_noise(noise_size);
-    }
+    if (noise_step > 0) {
 
-    // Prune w.r.t. individual transcriptomic median abundance.
-    if (tx_kmer_path != "") {
-        if (opt.verbose) std::cout << "Pruning w.r.t. individual transcriptomic median abundance." << std::endl;
-        t_graph.prune_individual_mean(tx_kmer_path, true, canary, keep_canary_kmers, opt.verbose);
-    }
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+        float mean = t_graph.mean_expression();
 
-    // Prune low coverage kmers with high abundance kmers within H1 neighborhood.
-    if (low_coverage_filter) {
-        if (opt.verbose) std::cout << "Pruning w.r.t. abundance of unitigs in H1 neighborhood." << std::endl;
-        t_graph.remove_low_wrt_h1(t_graph.pns.size()*0.05, opt.ratio_threshold, true, canary, keep_canary_kmers, opt.verbose);
-    }
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+        for (float magnitude = noise_step; magnitude <= noise_ub; magnitude += noise_step) {
 
-    // Remove tips with cardinality > 1
-    t_graph.flag_remove_tips(opt.verbose);
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
-    t_graph.remove_flagged_unitigs(canary, keep_canary_kmers, opt.verbose);
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+            if (opt.verbose) std::cout << "Adding Poisson-distributed noise with parameter mu*" << magnitude << " to counts." << std::endl;
+            t_graph.add_noise(noise_step * mean);
 
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+            // Prune w.r.t. individual transcriptomic median abundance.
+            if (tx_kmer_path != "") {
+                if (opt.verbose) std::cout << "Pruning w.r.t. individual transcriptomic median abundance." << std::endl;
+                t_graph.prune_individual_mean(tx_kmer_path, true, canary, keep_canary_kmers, opt.verbose);
+            }
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
 
-    // Calculate total number of reads per individual
-    std::vector<float> idx2total;
-    t_graph.tally_counts(idx2total);
-    if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+            // Prune low coverage kmers with high abundance kmers within H1 neighborhood.
+            if (low_coverage_filter) {
+                if (opt.verbose) std::cout << "Pruning w.r.t. abundance of unitigs in H1 neighborhood." << std::endl;
+                t_graph.remove_low_wrt_h1(t_graph.pns.size()*0.05, opt.ratio_threshold, true, canary, keep_canary_kmers, opt.verbose);
+            }
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
 
-    if (!dry_run) {
+            // Remove tips with cardinality > 1
+            t_graph.flag_remove_tips(opt.verbose);
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+            t_graph.remove_flagged_unitigs(canary, keep_canary_kmers, opt.verbose);
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+            // Calculate total number of reads per individual
+            std::vector<float> idx2total;
+            t_graph.tally_counts(idx2total);
+            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+            std::string od_ = od + "/noise" + std::to_string(magnitude);
+            if (!dry_run) {
+                t_graph.write(od_ + "/graph", opt.nb_threads, opt.verbose);
+                t_graph.write_abundances(od_ + "/pn2count");
+                t_graph.write_abundances(od_ + "/pn2count.normalized", idx2total);
+                t_graph.write_kmer2unitig(od_ + "/kmer2unitig");
+            }
+        }
+    } else if (!dry_run) {
+        // Prune w.r.t. individual transcriptomic median abundance.
+        if (tx_kmer_path != "") {
+            if (opt.verbose) std::cout << "Pruning w.r.t. individual transcriptomic median abundance." << std::endl;
+            t_graph.prune_individual_mean(tx_kmer_path, true, canary, keep_canary_kmers, opt.verbose);
+        }
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+        // Prune low coverage kmers with high abundance kmers within H1 neighborhood.
+        if (low_coverage_filter) {
+            if (opt.verbose) std::cout << "Pruning w.r.t. abundance of unitigs in H1 neighborhood." << std::endl;
+            t_graph.remove_low_wrt_h1(t_graph.pns.size()*0.05, opt.ratio_threshold, true, canary, keep_canary_kmers, opt.verbose);
+        }
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+        // Remove tips with cardinality > 1
+        t_graph.flag_remove_tips(opt.verbose);
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+        t_graph.remove_flagged_unitigs(canary, keep_canary_kmers, opt.verbose);
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
+
+        // Calculate total number of reads per individual
+        std::vector<float> idx2total;
+        t_graph.tally_counts(idx2total);
+        if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
         t_graph.write(od + "/graph", opt.nb_threads, opt.verbose);
         t_graph.write_abundances(od + "/pn2count");
         t_graph.write_abundances(od + "/pn2count.normalized", idx2total);

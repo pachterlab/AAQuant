@@ -56,6 +56,7 @@ class AbundanceCDBG {
         void detect_tips(std::vector<Kmer> &tips);
         void remove_tips(bool verbose);
 
+        float mean_expression();
         void add_noise(float size);
 
         bool prune_individual_mean(const std::string &path, bool flag, std::vector<Kmer> &canary, bool keep, bool verbose);

@@ -598,7 +598,7 @@ void AbundanceCDBG::flag_remove_tips(bool verbose=false) {
     flag_unitigs(tips, verbose);
 }
 
-void AbundanceCDBG::add_noise(float size) {
+float AbundanceCDBG::mean_expression() {
     // Calculate each PN's mean expression over all nodes
 
     Node* data;
@@ -623,11 +623,17 @@ void AbundanceCDBG::add_noise(float size) {
     for (size_t i = 0; i < idx2mean.size(); ++i) {
         mean += idx2mean[i] / lens[i];
     }
-    mean = mean / idx2mean.size();
+    return mean / idx2mean.size();
+}
+
+void AbundanceCDBG::add_noise(float size) {
+    // Add Poisson-distributed counts with magnitude size to abundances in the
+    // graph
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::poisson_distribution<> d(mean * size);
+    std::poisson_distribution<> d(size);
+    Node* data;
 
     for (auto um : dbg) {
         data = um.getData();
