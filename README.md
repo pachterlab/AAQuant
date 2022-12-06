@@ -31,4 +31,21 @@ pn2count
 pn2count.normalized
 ```
 
-Of these, `pn2count.normalized` is of most note, as it contains the normalized abundances of each vertex in the graph for each individual in the cohort. Zero abundances are not reported. Each line contains the identifier for the indeividual, the first `k` basepairs in the vertex, and the normalized abundance. The file `kmer2unitig` maps the first `k` basepairs in a vertex to the full sequence of the vertex`. `graph.gfa` contains the _de Bruijn_ graph itself, which can be visualized using [Bandage](https://rrwick.github.io/Bandage/).
+Of these, `pn2count.normalized` is of most note, as it contains the normalized abundances of each vertex in the graph for each individual in the cohort. Zero abundances are not reported. Each line contains the identifier for the indeividual, the first `k` basepairs in the vertex, and the normalized abundance. The file `kmer2unitig` maps the first `k` basepairs in a vertex to the full sequence of the vertex. `graph.gfa` contains the _de Bruijn_ graph itself, which can be visualized using [Bandage](https://rrwick.github.io/Bandage/).
+
+## Other options
+```
+  -h,--help                   Print a help message and exit
+  -v,--verbose                Print information about the pruning process to stdout.
+  -d,--dry_run                Constructs and prunes a DBG, and counts abundances without saving to disk.
+  -t,--threads INT            Maximum number of threads to be used.
+  -g,--graph TEXT             An existing de Bruijn graph to be pruned.
+  -f,--fasta TEXT             A single FASTX file containing RNA reads for association.
+  -s,--subtract TEXT ...      DBGs to be subtracted from the target DBG.
+  -r,--remove-kmers TEXT ...  Newline separated kmers whose encapsulating unitigs are to be removed from the target DBG.
+  -l,--transcriptomic-filter TEXT
+                              Assume unitigs that have coverage < max(1, 0.5% of median individual transcriptomic coverage) for an individual are sequencing errors and prune them. arg is a newline separated list of the kmers in all annotated transcripts of the gene.
+  -c,--low-coverage-filter    Filter out unitigs with per-individual coverage low w.r.t. the per-individual coverage of the H1 neighborhood around the unitig.
+  --ref-fasta-filter TEXT     Fasta file containing one sequence per entry, for example all known cDNA sequences for the organism. We find all kmers within H1 of the constituent kmers and prune the low coverage ones.
+  -o,--output TEXT            Directory to which the output files are to be saved.
+```
