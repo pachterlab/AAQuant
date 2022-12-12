@@ -12,6 +12,7 @@ bool AbundanceCDBG::build(const ACDBG_Build_opt &opt,
                           const std::vector<std::string> &bam_paths,
                           const std::string &region,
                           bool verbose=false) {
+    std::cout << "BAM files not supported" << std::endl;
     return false;
     /*
     CDBG_Build_opt c_opt;
@@ -23,7 +24,6 @@ bool AbundanceCDBG::build(const ACDBG_Build_opt &opt,
     c_opt.region = region;
     c_opt.verbose = opt.verbose;
     c_opt.filename_seq_in = bam_paths;
-
     bool build_finished = dbg.build(c_opt);
     return build_finished && dbg.simplify(c_opt.deleteIsolated, c_opt.clipTips, c_opt.verbose);
     */
@@ -117,10 +117,6 @@ bool AbundanceCDBG::remove_flagged_unitig(UnitigMap<Node> &um,
                                           std::vector<Kmer> &canary,
                                           bool keep, bool verbose=false) {
 
-    // BEGIN DEBUG
-    verbose = false;
-    // END DEBUG
-
     Node *data = um.getData();
     if (um.isEmpty || data->r.isEmpty()) {
         // Unitig is either nonextant or extant and not flagged; keep entire unitig
@@ -137,13 +133,7 @@ bool AbundanceCDBG::remove_flagged_unitig(UnitigMap<Node> &um,
     float read_counts = data->read_counts;
 
     std::string seq = um.referenceUnitigToString();
-    // BEGIN DEBUG
-    if (is_in_kmer_list(um, canary) || um.getUnitigHead().toString() == "ACGGCTGCCCGAAGCCCCCCGAGATTGCACT") {
-        std::cout << "============================" << std::endl;
-        std::cout << "Deleting an important unitig" << std::endl;
-        std::cout << "============================" << std::endl;
-    }
-    // END DEBUG
+
     Kmer kmer;
     UnitigMap<Node> new_um;
     // Get array of the indices of contiguous unflagged kmers from bit
@@ -172,10 +162,6 @@ bool AbundanceCDBG::remove_flagged_unitig(UnitigMap<Node> &um,
         r = nr;
     }
 
-    // DEBUG
-    bool is_jct = 0;
-    // END DEBUG
-
     // Create new unitigs from contiguous blocks in old unitig
     for (size_t i = 1; i < n_flags; ++i) {
         if (arr[i] == arr[i-1]+1) {
@@ -191,27 +177,18 @@ bool AbundanceCDBG::remove_flagged_unitig(UnitigMap<Node> &um,
             data = new_um.getData();
             data->abundance.getElements(new_elems);
 
-            // DEBUG
-            float before = 0., after = 0.;
-            // END DEBUG
-
             // If the unitig was joined to an extant unitig, the abundances are
             // the weighted averages of the abundances of the new and old unitigs
             for (const auto &it : new_elems) {
-                // DEBUG
-                before += data->abundance[it.first];
-                // END DEBUG
                 data->abundance[it.first] = it.second*(1-w_new);
             }
+
             for (const auto &it : elems) {
                 if (data->abundance.contains(it.first)) {
                     data->abundance[it.first] += it.second*w_new;
                 } else {
                     data->abundance.insert(it.first, it.second*w_new);
                 }
-                // DEBUG
-                after += data->abundance[it.first];
-                // END DEBUG
             }
             new_elems.clear();
 
@@ -277,15 +254,6 @@ bool AbundanceCDBG::subtract_graph(const std::string &path, size_t threads=1, bo
     m_dbg.read(path, threads);
     bool success = 1;
     int out = 0;
-
-    // BEGIN hack to bypass Bifrost bug
-    std::string troublesome_seq = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG";
-    Kmer troublesome_kmer(troublesome_seq.c_str());
-    UnitigMap<Node> troublesome_unitig = dbg.find(troublesome_kmer);
-    if (!troublesome_unitig.isEmpty) {
-        dbg.remove(troublesome_unitig);
-    }
-    // END hack to bypass Bifrost bug
 
     for (auto& m_um : m_dbg) {
         std::string unitig = m_um.mappedSequenceToString();
@@ -831,7 +799,7 @@ float AbundanceCDBG::canary_kmer_retention(std::vector<Kmer> &kmers) {
     float count = 0.;
     std::vector<std::pair<uint32_t, float> > elems;
     UnitigMap<Node> um;
-    // START DEBUG
+
     std::vector<std::string> canary_pns;
     for (const auto &kmer : kmers) {
         um = dbg.find(kmer);

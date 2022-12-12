@@ -25,9 +25,7 @@ class SparseVector {
         T& operator[] (size_t i);
         const T& operator[] (size_t i) const;
 
-        // BEGIN DEBUG
         std::vector<T> v;
-        // END DEBUG
 
     private:
         Roaring r;
