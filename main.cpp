@@ -202,6 +202,8 @@ int main(int argc, char* argv[]) {
     if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
 
     if (noise_step > 0) {
+        // Simulation of technical noise
+        // Add Poisson-distributed counts to nodes
 
         float mean = t_graph.mean_expression();
 
@@ -226,11 +228,7 @@ int main(int argc, char* argv[]) {
 
             // Remove tips with cardinality > 1
             t_graph.flag_remove_tips(opt.verbose);
-            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
             t_graph.remove_flagged_unitigs(canary, keep_canary_kmers, opt.verbose);
-            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
-
-            if (canary.size() > 0) t_graph.canary_kmer_retention(canary);
 
             // Calculate total number of reads per individual
             std::vector<float> idx2total;
